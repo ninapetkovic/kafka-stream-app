@@ -2,7 +2,7 @@
 
 Streaming data from [Kafka](http://kafka.apache.org/) and counting unique things within this data.
 
-Details in [doc/data_engineer_challenge.doc](https://github.com/ninapetkovic/kafka-stream-count/blob/master/doc/data_engineer_challenge.pdf)
+Details in [doc/data_engineer_challenge.doc](https://github.com/ninapetkovic/kafka-stream-app/blob/master/doc/data_engineer_challenge.pdf)
 
 ## Kafka installation  
 

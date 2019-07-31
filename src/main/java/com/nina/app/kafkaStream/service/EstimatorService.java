@@ -23,6 +23,8 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
@@ -38,7 +40,8 @@ import com.nina.app.kafkaStream.request.KafkaRequest;
 public class EstimatorService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(EstimatorService.class);
-	private static Map<String, String> env = System.getenv();
+	@Autowired
+	private static Environment env;
 
 	private static String json_key;
 	private static HashSet<String> hs;
@@ -106,19 +109,20 @@ public class EstimatorService {
 
 	private static KafkaStreams initKafkaStream(String src_str, String dst_str) {
 		java.util.Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.getProperty("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.getProperty("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.getProperty("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
-		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.getProperty("AUTO_OFFSET_RESET_CONFIG"));
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.getProperty("STATE_DIR_CONFIG"));
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource(env.get("SOURCE_NAME"), src_str);
-		builder.addProcessor(env.get("PROCESSOR_NAME"), new DataEstimatorProcessorSupplier(), env.get("SOURCE_NAME"));
-		builder.addSink(env.get("SINK_NAME"), dst_str, env.get("PROCESSOR_NAME"));
+		builder.addSource(env.getProperty("SOURCE_NAME"), src_str);
+		builder.addProcessor(env.getProperty("PROCESSOR_NAME"), new DataEstimatorProcessorSupplier(),
+				env.getProperty("SOURCE_NAME"));
+		builder.addSink(env.getProperty("SINK_NAME"), dst_str, env.getProperty("PROCESSOR_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -303,13 +307,13 @@ public class EstimatorService {
 	 */
 	public void getEstimator(KafkaRequest request) throws Exception {
 		Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.getProperty("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.getProperty("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.getProperty("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
-		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.getProperty("AUTO_OFFSET_RESET_CONFIG"));
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.getProperty("STATE_DIR_CONFIG"));
 
 		TopologyBuilder builder = new TopologyBuilder();
 

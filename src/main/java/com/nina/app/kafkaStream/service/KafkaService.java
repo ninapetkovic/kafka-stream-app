@@ -21,6 +21,8 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
@@ -36,7 +38,9 @@ import com.nina.app.kafkaStream.request.KafkaRequest;
 public class KafkaService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(KafkaService.class);
-	private static Map<String, String> env = System.getenv();
+	@Autowired
+	private static Environment env;
+
 
 	private static String json_key;
 	private static HashSet<String> hs;
@@ -94,13 +98,13 @@ public class KafkaService {
 
 	private static Properties initKafkaStream() {
 		Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.getProperty("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.getProperty("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.getProperty("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.getProperty("STATE_DIR_CONFIG"));
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.getProperty("AUTO_OFFSET_RESET_CONFIG"));
 
 		return props;
 	}
@@ -111,9 +115,9 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource(env.get("SOURCE_NAME"), src_str);
+		builder.addSource(env.getProperty("SOURCE_NAME"), src_str);
 
-		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
+		builder.addProcessor(env.getProperty("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.getProperty("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -124,9 +128,9 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource(env.get("SOURCE_NAME"), src_str);
+		builder.addSource(env.getProperty("SOURCE_NAME"), src_str);
 
-		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
+		builder.addProcessor(env.getProperty("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.getProperty("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -137,11 +141,11 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource(env.get("SOURCE_NAME"), src_str);
+		builder.addSource(env.getProperty("SOURCE_NAME"), src_str);
 
-		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
+		builder.addProcessor(env.getProperty("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.getProperty("SOURCE_NAME"));
 
-		builder.addSink(env.get("SINK_NAME"), dest_str, env.get("SOURCE_NAME"));
+		builder.addSink(env.getProperty("SINK_NAME"), dest_str, env.getProperty("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}

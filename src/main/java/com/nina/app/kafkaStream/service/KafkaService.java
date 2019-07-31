@@ -1,10 +1,11 @@
-package com.nina.app.kafka_stream.service;
+package com.nina.app.kafkaStream.service;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -18,11 +19,13 @@ import org.apache.kafka.streams.processor.TopologyBuilder;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.LinearCounting;
-import com.nina.app.kafka_stream.request.KafkaRequest;
+import com.nina.app.kafkaStream.request.KafkaRequest;
 
 /**
  * @author NinaPetkovic
@@ -31,6 +34,9 @@ import com.nina.app.kafka_stream.request.KafkaRequest;
  */
 @Service
 public class KafkaService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(KafkaService.class);
+	private static Map<String, String> env = System.getenv();
 
 	private static String json_key;
 	private static HashSet<String> hs;
@@ -48,7 +54,7 @@ public class KafkaService {
 	private static void processCounting(String line) {
 		try {
 			if (print) {
-				System.out.println(line);
+				LOG.info(line);
 			} else {
 				JSONParser parser = new JSONParser();
 				Object obj = parser.parse(new StringReader(line));
@@ -56,19 +62,19 @@ public class KafkaService {
 				String val = (String) jsonObject.get(json_key);
 				boolean added = false;
 				if (hs.add(val)) {
-					System.out.print("HASHSET=" + hs.size() + " ");
+					LOG.info("HASHSET=" + hs.size() + " ");
 					added = true;
 				}
 				if (hl.offer(val)) {
-					System.out.print("LOGLOG=" + hl.cardinality() + " ");
+					LOG.info("LOGLOG=" + hl.cardinality() + " ");
 					added = true;
 				}
 				if (lc.offer(val)) {
-					System.out.print("LINEAR=" + lc.cardinality() + " ");
+					LOG.info("LINEAR=" + lc.cardinality() + " ");
 					added = true;
 				}
 				if (added)
-					System.out.println(" NEW VAL=" + val);
+					LOG.info(" NEW VAL=" + val);
 			}
 		} catch (IOException ex) {
 			ex.printStackTrace();
@@ -88,13 +94,13 @@ public class KafkaService {
 
 	private static Properties initKafkaStream() {
 		Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, "kafka-app");
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181");
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(StreamsConfig.STATE_DIR_CONFIG, "{goodDir}");
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
 
 		return props;
 	}
@@ -105,9 +111,9 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource("Source", src_str);
+		builder.addSource(env.get("SOURCE_NAME"), src_str);
 
-		builder.addProcessor("Process", new KafkaPipeProcessorSupplier(), "Source");
+		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -118,9 +124,9 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource("Source", src_str);
+		builder.addSource(env.get("SOURCE_NAME"), src_str);
 
-		builder.addProcessor("Process", new KafkaPipeProcessorSupplier(), "Source");
+		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -131,11 +137,11 @@ public class KafkaService {
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource("Source", src_str);
+		builder.addSource(env.get("SOURCE_NAME"), src_str);
 
-		builder.addProcessor("Process", new KafkaPipeProcessorSupplier(), "Source");
+		builder.addProcessor(env.get("PROCESSOR_NAME"), new KafkaPipeProcessorSupplier(), env.get("SOURCE_NAME"));
 
-		builder.addSink("Sink", dest_str, "Source");
+		builder.addSink(env.get("SINK_NAME"), dest_str, env.get("SOURCE_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -159,9 +165,8 @@ public class KafkaService {
 				public void process(String dummy, String line) {
 					processCounting(line);
 					if (!print)
-						System.out.println(
-							"HASHSET=" + hs.size() + " HYPERLOG=" + hl.cardinality() + " LINEAR=" + lc.cardinality());
-
+						LOG.info("HASHSET=" + hs.size() + " HYPERLOG=" + hl.cardinality() + " LINEAR="
+								+ lc.cardinality());
 				}
 
 				@Override
@@ -182,7 +187,6 @@ public class KafkaService {
 	 * @throws Exception
 	 */
 	public void kafkaPipe(KafkaRequest request) throws Exception {
-
 		boolean std_in = false;
 		KafkaStreams kafka_stream = null;
 		BufferedReader br = null;
@@ -194,13 +198,13 @@ public class KafkaService {
 		if (!std_in)
 			kafka_stream = initKafkaStreamConsumer(source_stream);
 
-		System.out.println("-----------------------");
-		System.out.println("TOPIC " + source_stream);
-		System.out.println("JSON KEY " + json_key);
-		System.out.println("USING: HASHSET LOGLOG LINEAR");
-		System.out.println("-----------------------");
-		System.out.println("BEGINNING OF TOPIC DATA");
-		System.out.println("-----------------------");
+		LOG.info("-----------------------");
+		LOG.info("TOPIC " + source_stream);
+		LOG.info("JSON KEY " + json_key);
+		LOG.info("USING: HASHSET LOGLOG LINEAR");
+		LOG.info("-----------------------");
+		LOG.info("BEGINNING OF TOPIC DATA");
+		LOG.info("-----------------------");
 
 		if (std_in) {
 			try {
@@ -221,13 +225,12 @@ public class KafkaService {
 		// avoid running forever
 		Thread.sleep(150000L);
 
-		System.out.println("-----------------------");
-		System.out.println("END OF TOPIC DATA");
-		System.out.println("-----------------------");
-
 		if (!std_in)
 			kafka_stream.close();
 
+		LOG.info("-----------------------");
+		LOG.info("END OF TOPIC DATA");
+		LOG.info("-----------------------");
 	}
 
 	/**
@@ -248,13 +251,13 @@ public class KafkaService {
 		if (!std_in)
 			kafka_stream = initKafkaStreamPrint(source_stream, destination_stream);
 
-		System.out.println("-----------------------");
-		System.out.println("TOPIC " + source_stream);
-		System.out.println("JSON KEY " + json_key);
-		System.out.println("USING: HASHSET LOGLOG LINEAR");
-		System.out.println("-----------------------");
-		System.out.println("BEGINNING OF TOPIC DATA");
-		System.out.println("-----------------------");
+		LOG.info("-----------------------");
+		LOG.info("TOPIC " + source_stream);
+		LOG.info("JSON KEY " + json_key);
+		LOG.info("USING: HASHSET LOGLOG LINEAR");
+		LOG.info("-----------------------");
+		LOG.info("BEGINNING OF TOPIC DATA");
+		LOG.info("-----------------------");
 
 		if (std_in) {
 			try {
@@ -275,14 +278,13 @@ public class KafkaService {
 		// avoid running forever
 		Thread.sleep(150000L);
 
-
-
 		if (!std_in)
 			kafka_stream.close();
 		print = false;
-		System.out.println("-----------------------");
-		System.out.println("END OF TOPIC DATA");
-		System.out.println("-----------------------");
+
+		LOG.info("-----------------------");
+		LOG.info("END OF TOPIC DATA");
+		LOG.info("-----------------------");
 
 	}
 
@@ -303,13 +305,13 @@ public class KafkaService {
 		if (!std_in)
 			kafka_stream = initKafkaStreamProducer(source_stream, destination_stream);
 
-		System.out.println("-----------------------");
-		System.out.println("TOPIC " + source_stream);
-		System.out.println("JSON KEY " + json_key);
-		System.out.println("USING: HASHSET LOGLOG LINEAR");
-		System.out.println("-----------------------");
-		System.out.println("BEGINNING OF TOPIC DATA");
-		System.out.println("-----------------------");
+		LOG.info("-----------------------");
+		LOG.info("TOPIC " + source_stream);
+		LOG.info("JSON KEY " + json_key);
+		LOG.info("USING: HASHSET LOGLOG LINEAR");
+		LOG.info("-----------------------");
+		LOG.info("BEGINNING OF TOPIC DATA");
+		LOG.info("-----------------------");
 
 		if (std_in) {
 			try {
@@ -332,9 +334,10 @@ public class KafkaService {
 
 		if (!std_in)
 			kafka_stream.close();
-		System.out.println("-----------------------");
-		System.out.println("END OF TOPIC DATA");
-		System.out.println("-----------------------");
+
+		LOG.info("-----------------------");
+		LOG.info("END OF TOPIC DATA");
+		LOG.info("-----------------------");
 	}
 
 }

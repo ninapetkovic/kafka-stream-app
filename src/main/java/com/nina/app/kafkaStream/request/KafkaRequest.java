@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.nina.app.kafka_stream.request;
+package com.nina.app.kafkaStream.request;
 
 /**
  * @author NinaPetkovic

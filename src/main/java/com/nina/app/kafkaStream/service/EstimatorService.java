@@ -1,4 +1,4 @@
-package com.nina.app.kafka_stream.service;
+package com.nina.app.kafkaStream.service;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -21,11 +21,13 @@ import org.apache.kafka.streams.processor.TopologyBuilder;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.LinearCounting;
-import com.nina.app.kafka_stream.request.KafkaRequest;
+import com.nina.app.kafkaStream.request.KafkaRequest;
 
 /**
  * @author NinaPetkovic
@@ -34,6 +36,10 @@ import com.nina.app.kafka_stream.request.KafkaRequest;
  */
 @Service
 public class EstimatorService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(EstimatorService.class);
+	private static Map<String, String> env = System.getenv();
+
 	private static String json_key;
 	private static HashSet<String> hs;
 	private static HyperLogLog hl;
@@ -68,19 +74,19 @@ public class EstimatorService {
 			long ts = (Long) jsonObject.get("ts");
 			boolean added = false;
 			if (hs.add(val)) {
-				System.out.print("HASHSET=" + hs.size() + " ");
+				LOG.info("HASHSET=" + hs.size() + " ");
 				added = true;
 			}
 			if (hl.offer(val)) {
-				System.out.print("LOGLOG=" + hl.cardinality() + " ");
+				LOG.info("LOGLOG=" + hl.cardinality() + " ");
 				added = true;
 			}
 			if (lc.offer(val)) {
-				System.out.print("LINEAR=" + lc.cardinality() + " ");
+				LOG.info("LINEAR=" + lc.cardinality() + " ");
 				added = true;
 			}
 			if (added)
-				System.out.println("TS=" + ts + " NEW VAL=" + (val + "XXXXXXXXXX").substring(0, 10));
+				LOG.info("TS=" + ts + " NEW VAL=" + (val + "XXXXXXXXXX").substring(0, 10));
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		} catch (ParseException ex) {
@@ -92,31 +98,27 @@ public class EstimatorService {
 	}
 
 	private static void punctuateCounting(long timestamp) {
-		System.out.println(new Date(timestamp).toString());
-
+		LOG.info(new Date(timestamp).toString());
 	}
 
 	private static void closeCounting() {
 	}
 
-
-
-
 	private static KafkaStreams initKafkaStream(String src_str, String dst_str) {
 		java.util.Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, "kafka-app");
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181");
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-		props.put(StreamsConfig.STATE_DIR_CONFIG, "{goodDir}");
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
 
 		TopologyBuilder builder = new TopologyBuilder();
 
-		builder.addSource("Source", src_str);
-		builder.addProcessor("Process", new DataEstimatorProcessorSupplier(), "Source");
-		builder.addSink("Destination", dst_str, "Process");
+		builder.addSource(env.get("SOURCE_NAME"), src_str);
+		builder.addProcessor(env.get("PROCESSOR_NAME"), new DataEstimatorProcessorSupplier(), env.get("SOURCE_NAME"));
+		builder.addSink(env.get("SINK_NAME"), dst_str, env.get("PROCESSOR_NAME"));
 
 		return new KafkaStreams(builder, props);
 	}
@@ -155,9 +157,7 @@ public class EstimatorService {
 				@Override
 				public void process(String dummy, String line) {
 					processCounting(line);
-					System.out.println(
-							"HASHSET=" + hs.size() + " HYPERLOG=" + hl.cardinality() + " LINEAR=" + lc.cardinality());
-
+					LOG.info("HASHSET=" + hs.size() + " HYPERLOG=" + hl.cardinality() + " LINEAR=" + lc.cardinality());
 				}
 
 				@Override
@@ -221,7 +221,7 @@ public class EstimatorService {
 		}
 
 		if (std_in) {
-			System.out.println(estimatorJSON());
+			LOG.info(estimatorJSON());
 		}
 
 		Thread.sleep(2000000L);
@@ -256,7 +256,7 @@ public class EstimatorService {
 				public void process(String dummy, String line) {
 
 					try {
-						System.out.println(line);
+						LOG.info(line);
 						JSONParser parser = new JSONParser();
 						Object obj = parser.parse(new StringReader(line));
 						JSONObject jsonObject = (JSONObject) obj;
@@ -276,7 +276,7 @@ public class EstimatorService {
 						obj1.put("ts", ts);
 						obj1.put("range", range);
 						obj1.put("ec", ec);
-						System.out.println(obj1.toJSONString());
+						LOG.info(obj1.toJSONString());
 					} catch (IOException ex) {
 						ex.printStackTrace();
 					} catch (ParseException ex) {
@@ -303,13 +303,13 @@ public class EstimatorService {
 	 */
 	public void getEstimator(KafkaRequest request) throws Exception {
 		Properties props = new Properties();
-		props.put(StreamsConfig.APPLICATION_ID_CONFIG, "sdajhksd");
-		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181");
+		props.put(StreamsConfig.APPLICATION_ID_CONFIG, env.get("APPLICATION_ID_CONFIG"));
+		props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, env.get("BOOTSTRAP_SERVERS_CONFIG"));
+		props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, env.get("ZOOKEEPER_CONNECT_CONFIG"));
 		props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 		props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-		props.put(StreamsConfig.STATE_DIR_CONFIG, "{goodDir}");
+		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, env.get("AUTO_OFFSET_RESET_CONFIG"));
+		props.put(StreamsConfig.STATE_DIR_CONFIG, env.get("STATE_DIR_CONFIG"));
 
 		TopologyBuilder builder = new TopologyBuilder();
 
@@ -322,10 +322,11 @@ public class EstimatorService {
 		streams.start();
 
 		// usually the stream application would be running forever,
-		// we just let it run for some time and stop since the input data is finite.
+		// we just let it run for some time and stop since the input data is
+		// finite.
 		Thread.sleep(150000L);
 
-		System.out.println("Estimation finished!");
+		LOG.info("Estimation finished!");
 		streams.close();
 
 	}
